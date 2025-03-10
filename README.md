@@ -4,7 +4,7 @@ A 3D physics simulation of 8 balls of varying sizes interacting within a 12-side
 
 ## Live Demo
 
-Visit [https://tumble-simulation.netlify.app](https://tumble-simulation.netlify.app) to see the simulation in action.
+Visit [https://dew-tumble.netlify.app](https://dew-tumble.netlify.app) to see the simulation in action.
 
 ## Features
 
@@ -50,3 +50,14 @@ npm run netlify
 
 - **Reset Simulation**: Resets the positions of all balls
 - **Toggle Tumbler Rotation**: Starts/stops the tumbler rotation
+
+## Prompts
+
+This project was built with Claude Code. Here is the seed prompt used:
+```We are going to build a web visualization that shows a 12 sided tumbler in which 8 different balls will interact. It's important that the       │
+│   balls never exit the tumbler or intersect each other - I'm looking for accurate collision meshes and realistic physics. Please carefully        │
+│   choose a javascript framework and architecture that will ensure the correctness of the physics simulation as described. Make a detailed         │
+│   project plan before writing any code. Also plan to write tests to ensure the consistency and correctness of the simulation before proceeding    │
+│   to visualizations.  ```
+
+I produced the project you see here in 30 minutes with $2.01 of compute cost.
