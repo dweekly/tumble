@@ -1,18 +1,29 @@
 import * as CANNON from 'cannon-es';
-import { BALL_RADIUS, BALL_MASS, RESTITUTION, FRICTION } from '../utils/constants';
+import { BASE_BALL_RADIUS, MIN_BALL_RADIUS, MAX_BALL_RADIUS, BALL_MASS, RESTITUTION, FRICTION } from '../utils/constants';
 
 export default class Ball {
-  constructor(position, world) {
+  constructor(position, world, radius = null) {
+    // If no radius provided, use a random radius within the allowed range
+    this.radius = radius || this.getRandomRadius();
+    
     this.createBody(position);
     this.addToWorld(world);
   }
+  
+  getRandomRadius() {
+    // Generate a random radius between MIN_BALL_RADIUS and MAX_BALL_RADIUS
+    return MIN_BALL_RADIUS + Math.random() * (MAX_BALL_RADIUS - MIN_BALL_RADIUS);
+  }
 
   createBody(position) {
-    // Create the physics body
+    // Scale the mass based on the radius (mass proportional to volume)
+    const scaledMass = BALL_MASS * Math.pow(this.radius / BASE_BALL_RADIUS, 3);
+    
+    // Create the physics body with the custom radius
     this.body = new CANNON.Body({
-      mass: BALL_MASS,
+      mass: scaledMass,
       position: new CANNON.Vec3(position.x, position.y, position.z),
-      shape: new CANNON.Sphere(BALL_RADIUS),
+      shape: new CANNON.Sphere(this.radius),
       material: new CANNON.Material({ restitution: RESTITUTION, friction: FRICTION })
     });
     
@@ -49,6 +60,6 @@ export default class Ball {
   // Check if this ball is intersecting with another ball
   intersects(otherBall) {
     const distance = this.body.position.distanceTo(otherBall.body.position);
-    return distance < (BALL_RADIUS + BALL_RADIUS);
+    return distance < (this.radius + otherBall.radius);
   }
 }

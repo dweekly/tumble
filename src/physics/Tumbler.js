@@ -1,25 +1,59 @@
 import * as CANNON from 'cannon-es';
-import { TUMBLER_RADIUS, RESTITUTION, FRICTION } from '../utils/constants';
+import { TUMBLER_RADIUS, RESTITUTION, FRICTION, BASE_RPM, ROTATION_CHANGE_INTERVAL, ROTATION_TRANSITION_TIME } from '../utils/constants';
 
 export default class Tumbler {
   constructor(world) {
     this.world = world;
     this.isRotating = false;
     
-    // 4 RPM = 4 revolutions per minute
-    // = 4 * (2π radians) / 60 seconds
-    // ≈ 0.419 radians per second
-    this.rotationSpeed = (4 * 2 * Math.PI) / 60; // radians per second
+    // Calculate base rotation speed
+    // BASE_RPM = revolutions per minute
+    // Convert to radians/second
+    this.baseRotationSpeed = (BASE_RPM * 2 * Math.PI) / 60;
     
-    // Rotation axes with different speeds for more natural motion
-    this.rotationAxes = [
-      { axis: new CANNON.Vec3(1, 0, 0), speed: this.rotationSpeed * 0.7 }, // X-axis
-      { axis: new CANNON.Vec3(0, 1, 0), speed: this.rotationSpeed },       // Y-axis
-      { axis: new CANNON.Vec3(0, 0, 1), speed: this.rotationSpeed * 0.5 }  // Z-axis
-    ];
+    // Initialize rotation settings
+    this.initializeRotation();
+    
+    // Set up automatic rotation changes
+    this.lastRotationChangeTime = 0;
+    this.transitionStartTime = 0;
+    this.transitionProgress = 1; // Start with completed transition
+    this.oldRotationAxes = null;
+    this.newRotationAxes = null;
     
     this.createBody();
     this.addToWorld();
+  }
+  
+  // Generate a random set of rotation axes with varying speeds
+  generateRandomRotation() {
+    const generateRandomAxis = () => {
+      // Generate a random unit vector direction
+      const x = Math.random() * 2 - 1;
+      const y = Math.random() * 2 - 1;
+      const z = Math.random() * 2 - 1;
+      
+      // Convert to unit vector
+      const length = Math.sqrt(x*x + y*y + z*z);
+      return new CANNON.Vec3(x/length, y/length, z/length);
+    };
+    
+    const generateRandomSpeed = () => {
+      // Generate a speed between 0.5x and 1.5x the base rotation speed
+      return this.baseRotationSpeed * (0.5 + Math.random());
+    };
+    
+    // Generate 3 random rotation axes with varying speeds
+    return [
+      { axis: generateRandomAxis(), speed: generateRandomSpeed() },
+      { axis: generateRandomAxis(), speed: generateRandomSpeed() },
+      { axis: generateRandomAxis(), speed: generateRandomSpeed() }
+    ];
+  }
+  
+  // Initialize rotation with random axes
+  initializeRotation() {
+    this.rotationAxes = this.generateRandomRotation();
   }
 
   createBody() {
@@ -109,13 +143,95 @@ export default class Tumbler {
     return this.isRotating;
   }
 
-  update(dt) {
+  // Check if it's time to change rotation
+  checkRotationChange(currentTime) {
+    if (currentTime - this.lastRotationChangeTime > ROTATION_CHANGE_INTERVAL) {
+      // Start a new rotation transition
+      this.lastRotationChangeTime = currentTime;
+      this.transitionStartTime = currentTime;
+      this.transitionProgress = 0;
+      
+      this.oldRotationAxes = this.rotationAxes;
+      this.newRotationAxes = this.generateRandomRotation();
+    }
+  }
+  
+  // Interpolate between two rotation settings
+  interpolateRotations(progress) {
+    // If no transition is in progress, return current axes
+    if (!this.oldRotationAxes || !this.newRotationAxes || progress >= 1) {
+      return this.rotationAxes;
+    }
+    
+    // Create interpolated rotation axes
+    return this.oldRotationAxes.map((oldRotation, index) => {
+      const newRotation = this.newRotationAxes[index];
+      
+      // Interpolate axis - using SLERP (Spherical Linear Interpolation) for smooth rotation
+      const oldAxis = oldRotation.axis;
+      const newAxis = newRotation.axis;
+      
+      // Calculate the dot product between the axes
+      const dot = oldAxis.dot(newAxis);
+      
+      // If axes are nearly parallel, use simple linear interpolation
+      if (Math.abs(dot) > 0.9999) {
+        return {
+          axis: new CANNON.Vec3(
+            oldAxis.x + progress * (newAxis.x - oldAxis.x),
+            oldAxis.y + progress * (newAxis.y - oldAxis.y),
+            oldAxis.z + progress * (newAxis.z - oldAxis.z)
+          ).unit(), // Normalize to ensure it's a unit vector
+          speed: oldRotation.speed + progress * (newRotation.speed - oldRotation.speed)
+        };
+      }
+      
+      // For non-parallel axes, use SLERP
+      // Calculate the angle between the vectors
+      const theta = Math.acos(dot);
+      const sinTheta = Math.sin(theta);
+      
+      // Calculate interpolation factors
+      const factorOld = Math.sin((1 - progress) * theta) / sinTheta;
+      const factorNew = Math.sin(progress * theta) / sinTheta;
+      
+      // Interpolate the axis using SLERP
+      const interpolatedAxis = new CANNON.Vec3(
+        oldAxis.x * factorOld + newAxis.x * factorNew,
+        oldAxis.y * factorOld + newAxis.y * factorNew,
+        oldAxis.z * factorOld + newAxis.z * factorNew
+      ).unit(); // Normalize again to ensure it's a unit vector
+      
+      // Linearly interpolate the speed
+      const interpolatedSpeed = oldRotation.speed + progress * (newRotation.speed - oldRotation.speed);
+      
+      return { axis: interpolatedAxis, speed: interpolatedSpeed };
+    });
+  }
+  
+  update(dt, currentTime = Date.now()) {
     if (this.isRotating) {
-      // Apply rotation around all three axes
+      // Check if it's time to change rotation
+      this.checkRotationChange(currentTime);
+      
+      // Update transition progress if a transition is ongoing
+      if (this.transitionProgress < 1) {
+        this.transitionProgress = Math.min(1, (currentTime - this.transitionStartTime) / ROTATION_TRANSITION_TIME);
+        
+        // If transition just completed, update the current rotation
+        if (this.transitionProgress >= 1) {
+          this.rotationAxes = this.newRotationAxes;
+        }
+      }
+      
+      // Get the current interpolated rotation axes
+      const currentRotationAxes = this.interpolateRotations(this.transitionProgress);
+      
+      // Apply rotation around all axes
       let finalQuaternion = this.body.quaternion.clone();
       
       // Apply rotations for each axis
-      for (const rotation of this.rotationAxes) {
+      for (const rotation of currentRotationAxes) {
         const rotationAngle = rotation.speed * dt;
         const q = new CANNON.Quaternion();
         q.setFromAxisAngle(rotation.axis, rotationAngle);

@@ -49,7 +49,8 @@ class TumbleSimulation {
     
     // Update physics (if enough time has passed)
     if (dt > 0) {
-      this.physicsWorld.update(dt);
+      // Use current time for rotation transitions
+      this.physicsWorld.update(dt, time);
     }
   }
 }

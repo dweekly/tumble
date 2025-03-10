@@ -89,9 +89,13 @@ export default class Renderer {
     this.ballMeshes = [];
     const balls = this.physicsWorld.getBalls();
     
-    const ballGeometry = new THREE.SphereGeometry(BALL_RADIUS, 32, 32);
-    
     for (let i = 0; i < balls.length; i++) {
+      const ball = balls[i];
+      const radius = ball.radius; // Use the ball's specific radius
+      
+      // Create geometry with the specific radius for this ball
+      const ballGeometry = new THREE.SphereGeometry(radius, 32, 32);
+      
       const color = BALL_COLORS[i % BALL_COLORS.length];
       const ballMaterial = new THREE.MeshPhongMaterial({ 
         color, 

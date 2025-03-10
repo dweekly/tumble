@@ -6,7 +6,9 @@ import {
   GRAVITY, 
   TIMESTEP, 
   MAX_SUBSTEPS,
-  BALL_RADIUS, 
+  BASE_BALL_RADIUS, 
+  MIN_BALL_RADIUS,
+  MAX_BALL_RADIUS,
   TUMBLER_RADIUS
 } from '../utils/constants';
 
@@ -59,8 +61,10 @@ export default class PhysicsWorld {
         
         // Check distance from each existing ball
         for (let j = 0; j < balls.length; j++) {
-          const dist = position.distanceTo(balls[j].getPosition());
-          if (dist < BALL_RADIUS * 2.5) { // Increased margin for safer placement
+          const existingBall = balls[j];
+          const dist = position.distanceTo(existingBall.getPosition());
+          // Use maximum possible radius for initial placement (will be refined after ball creation)
+          if (dist < MAX_BALL_RADIUS * 2.5) { // Increased margin for safer placement
             valid = false;
             break;
           }
@@ -72,7 +76,7 @@ export default class PhysicsWorld {
           // For the first few balls, ensure some minimum distance from the center
           // to avoid all balls piling in the middle
           const distFromCenter = position.distanceTo(tumblerCenter);
-          if (distFromCenter < BALL_RADIUS * (i + 1) * 0.5) {
+          if (distFromCenter < MAX_BALL_RADIUS * (i + 1) * 0.5) {
             valid = false;
           }
         }
@@ -83,7 +87,7 @@ export default class PhysicsWorld {
       if (!valid) {
         position = new CANNON.Vec3(
           tumblerCenter.x,
-          tumblerCenter.y + i * BALL_RADIUS * 2.5, // Stack vertically if needed
+          tumblerCenter.y + i * MAX_BALL_RADIUS * 2.5, // Stack vertically if needed
           tumblerCenter.z
         );
       }
@@ -103,7 +107,7 @@ export default class PhysicsWorld {
       for (let ball of this.balls) {
         const pos = ball.getPosition();
         const distanceFromCenter = pos.distanceTo(this.tumbler.getPosition());
-        const safeDistance = TUMBLER_RADIUS - BALL_RADIUS - 0.2; // Add extra safety margin
+        const safeDistance = TUMBLER_RADIUS - ball.radius - 0.2; // Add extra safety margin
         
         // If a ball has somehow escaped or is too close to the edge, move it back inside
         if (distanceFromCenter > safeDistance) {
@@ -161,7 +165,7 @@ export default class PhysicsWorld {
             }
             
             // Separate the balls
-            const minDistance = BALL_RADIUS * 2;
+            const minDistance = ball1.radius + ball2.radius;
             const penetration = minDistance - distance;
             
             // Move balls apart and apply opposite impulses
@@ -190,9 +194,9 @@ export default class PhysicsWorld {
     });
   }
   
-  update(dt = TIMESTEP) {
-    // Update tumbler rotation
-    this.tumbler.update(dt);
+  update(dt = TIMESTEP, currentTime = Date.now()) {
+    // Update tumbler rotation with current time for transitions
+    this.tumbler.update(dt, currentTime);
     
     // Step the physics world forward
     this.world.step(dt, dt, MAX_SUBSTEPS);
