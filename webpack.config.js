@@ -1,5 +1,6 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyPlugin = require('copy-webpack-plugin');
 
 module.exports = {
   mode: 'development',
@@ -17,6 +18,17 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({
       template: './public/index.html',
+      favicon: './public/favicon.ico',
+      title: 'Tumble Physics Simulation',
+      meta: {
+        'viewport': 'width=device-width, initial-scale=1, shrink-to-fit=no',
+        'description': '3D physics simulation of balls in a 12-sided tumbler',
+      }
+    }),
+    new CopyPlugin({
+      patterns: [
+        { from: '_redirects', to: '' },
+      ],
     }),
   ],
   module: {
